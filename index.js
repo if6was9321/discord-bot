@@ -6,7 +6,7 @@ const client = new Client({
 
     GatewayIntentBits.Guilds,
 
-    G
+    
 
 
     
