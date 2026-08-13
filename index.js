@@ -468,4 +468,4 @@ client.on("interactionCreate", async interaction => {
 
 // ログイン
 
-client.login(process.env.DISCORD_TOKEN
+client.login(process.env.DISCORD_TOKEN);
