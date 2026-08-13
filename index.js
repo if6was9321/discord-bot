@@ -10,15 +10,17 @@ const {
 
   ButtonStyle,
 
+  StringSelectMenuBuilder,
+
   ModalBuilder,
 
   TextInputBuilder,
 
   TextInputStyle,
 
-  StringSelectMenuBuilder
+  Events
 
-} = require('discord.js');
+} = require("discord.js");
 
 const client = new Client({
 
@@ -30,25 +32,63 @@ const client = new Client({
 
 const cells = Array.from({ length: 25 }, () => ({
 
-  name: '',
+  name: "",
 
-  color: ''
+  color: null
 
 }));
 
-const emojis = {
+// ユーザーが編集中のマス
 
-  red: '🔴',
+const editing = new Map();
 
-  green: '🟢',
+// 色
 
-  blue: '🔵',
+const colors = {
 
-  orange: '🟠'
+  red: {
+
+    name: "赤",
+
+    emoji: "🔴",
+
+    style: ButtonStyle.Danger
+
+  },
+
+  green: {
+
+    name: "緑",
+
+    emoji: "🟢",
+
+    style: ButtonStyle.Success
+
+  },
+
+  blue: {
+
+    name: "青",
+
+    emoji: "🔵",
+
+    style: ButtonStyle.Primary
+
+  },
+
+  orange: {
+
+    name: "オレンジ",
+
+    emoji: "🟠",
+
+    style: ButtonStyle.Secondary
+
+  }
 
 };
 
-// 5×5の盤面を作る
+// 5×5のマスを作る
 
 function createBoard() {
 
@@ -60,29 +100,49 @@ function createBoard() {
 
     for (let x = 0; x < 5; x++) {
 
-      const i = y * 5 + x;
+      const index = y * 5 + x;
 
-      const cell = cells[i];
+      const cell = cells[index];
 
-      let label = `${i + 1}`;
+      const button = new ButtonBuilder()
 
-      if (cell.name && cell.color) {
+        .setCustomId(`cell_${index}`)
 
-        label = `${emojis[cell.color]}${cell.name}`;
+        .setStyle(
+
+          cell.color
+
+            ? colors[cell.color].style
+
+            : ButtonStyle.Secondary
+
+        );
+
+      // 名前がある時だけ表示
+
+      // 空マスは数字を表示しない
+
+      if (cell.name) {
+
+        button.setLabel(cell.name);
+
+        if (cell.color) {
+
+          button.setEmoji(colors[cell.color].emoji);
+
+        }
+
+      } else {
+
+        // Discordボタンは完全な空文字にできないので
+
+        // 見えない文字を入れて空マスにする
+
+        button.setLabel("\u200B");
 
       }
 
-      row.addComponents(
-
-        new ButtonBuilder()
-
-          .setCustomId(`cell_${i}`)
-
-          .setLabel(label)
-
-          .setStyle(ButtonStyle.Secondary)
-
-      );
+      row.addComponents(button);
 
     }
 
@@ -94,113 +154,147 @@ function createBoard() {
 
 }
 
-client.once('ready', async () => {
+client.once(Events.ClientReady, async readyClient => {
 
-  console.log(`ログイン成功: ${client.user.tag}`);
+  console.log(`ログイン成功: ${readyClient.user.tag}`);
 
-  await client.application.commands.set([
+  const commands = [
 
     {
 
-      name: '配置',
+      name: "配置",
 
-      description: '5×5の配置ボードを表示'
+      description: "配置ボードを表示します"
 
     }
 
-  ]);
+  ];
+
+  await client.application.commands.set(commands);
+
+  console.log("コマンド登録完了");
 
 });
 
-client.on('interactionCreate', async interaction => {
+client.on(Events.InteractionCreate, async interaction => {
+
+  // ──────────────
 
   // /配置
 
+  // ──────────────
+
   if (interaction.isChatInputCommand()) {
 
-    if (interaction.commandName === '配置') {
+    if (interaction.commandName === "配置") {
 
       await interaction.reply({
 
-        content: 'マスをタップしてください',
+        content: "マスをタップしてください",
 
         components: createBoard()
 
       });
 
-    }
+      return;
 
-    return;
+    }
 
   }
 
+  // ──────────────
+
   // マスを押した
 
-  if (interaction.isButton()) {
+  // ──────────────
 
-    if (!interaction.customId.startsWith('cell_')) return;
+  if (
 
-    const index = interaction.customId.split('_')[1];
+    interaction.isButton() &&
 
-    const menu = new StringSelectMenuBuilder()
+    interaction.customId.startsWith("cell_")
 
-      .setCustomId(`color_${index}`)
+  ) {
 
-      .setPlaceholder('色を選んでください')
+    const index = Number(
 
-      .addOptions(
+      interaction.customId.replace("cell_", "")
 
-        {
+    );
 
-          label: '赤',
+    editing.set(interaction.user.id, {
 
-          value: 'red',
+      index,
 
-          emoji: '🔴'
+      messageId: interaction.message.id,
 
-        },
+      channelId: interaction.channelId
 
-        {
+    });
 
-          label: '緑',
+    const menu =
 
-          value: 'green',
+      new StringSelectMenuBuilder()
 
-          emoji: '🟢'
+        .setCustomId("select_color")
 
-        },
+        .setPlaceholder("色を選択")
 
-        {
+        .addOptions(
 
-          label: '青',
+          {
 
-          value: 'blue',
+            label: "赤",
 
-          emoji: '🔵'
+            value: "red",
 
-        },
+            emoji: "🔴"
 
-        {
+          },
 
-          label: 'オレンジ',
+          {
 
-          value: 'orange',
+            label: "緑",
 
-          emoji: '🟠'
+            value: "green",
 
-        }
+            emoji: "🟢"
 
-      );
+          },
+
+          {
+
+            label: "青",
+
+            value: "blue",
+
+            emoji: "🔵"
+
+          },
+
+          {
+
+            label: "オレンジ",
+
+            value: "orange",
+
+            emoji: "🟠"
+
+          }
+
+        );
+
+    const row =
+
+      new ActionRowBuilder()
+
+        .addComponents(menu);
 
     await interaction.reply({
 
-      content: '色を選んでください',
+      content: "色を選んでください",
 
-      components: [
-
-        new ActionRowBuilder().addComponents(menu)
-
-      ],
+      components: [row],
 
       ephemeral: true
 
@@ -210,39 +304,69 @@ client.on('interactionCreate', async interaction => {
 
   }
 
-  // 色を選んだ
+  // ──────────────
 
-  if (interaction.isStringSelectMenu()) {
+  // 色を選択
 
-    if (!interaction.customId.startsWith('color_')) return;
+  // ──────────────
 
-    const index = interaction.customId.split('_')[1];
+  if (
 
-    const color = interaction.values[0];
+    interaction.isStringSelectMenu() &&
 
-    const modal = new ModalBuilder()
+    interaction.customId === "select_color"
 
-      .setCustomId(`name_${index}_${color}`)
+  ) {
 
-      .setTitle('名前を入力');
+    const data = editing.get(interaction.user.id);
 
-    const input = new TextInputBuilder()
+    if (!data) {
 
-      .setCustomId('name')
+      await interaction.reply({
 
-      .setLabel('マスに表示する名前')
+        content: "もう一度マスを選んでください",
 
-      .setStyle(TextInputStyle.Short)
+        ephemeral: true
 
-      .setRequired(true)
+      });
 
-      .setMaxLength(20);
+      return;
 
-    modal.addComponents(
+    }
 
-      new ActionRowBuilder().addComponents(input)
+    data.color = interaction.values[0];
 
-    );
+    editing.set(interaction.user.id, data);
+
+    const modal =
+
+      new ModalBuilder()
+
+        .setCustomId("name_modal")
+
+        .setTitle("名前を入力");
+
+    const input =
+
+      new TextInputBuilder()
+
+        .setCustomId("cell_name")
+
+        .setLabel("マスに表示する名前")
+
+        .setStyle(TextInputStyle.Short)
+
+        .setRequired(true)
+
+        .setMaxLength(20);
+
+    const row =
+
+      new ActionRowBuilder()
+
+        .addComponents(input);
+
+    modal.addComponents(row);
 
     await interaction.showModal(modal);
 
@@ -250,35 +374,93 @@ client.on('interactionCreate', async interaction => {
 
   }
 
-  // 名前入力完了
+  // ──────────────
 
-  if (interaction.isModalSubmit()) {
+  // 名前を入力した
 
-    if (!interaction.customId.startsWith('name_')) return;
+  // ──────────────
 
-    const parts = interaction.customId.split('_');
+  if (
 
-    const index = Number(parts[1]);
+    interaction.isModalSubmit() &&
 
-    const color = parts[2];
+    interaction.customId === "name_modal"
 
-    const name = interaction.fields.getTextInputValue('name');
+  ) {
 
-    cells[index] = {
+    const data = editing.get(interaction.user.id);
+
+    if (!data) {
+
+      await interaction.reply({
+
+        content: "もう一度マスを選んでください",
+
+        ephemeral: true
+
+      });
+
+      return;
+
+    }
+
+    const name =
+
+      interaction.fields.getTextInputValue("cell_name");
+
+    cells[data.index] = {
 
       name,
 
-      color
+      color: data.color
 
     };
 
+    // 元の5×5ボードを更新
+
+    try {
+
+      const channel =
+
+        await client.channels.fetch(data.channelId);
+
+      const message =
+
+        await channel.messages.fetch(data.messageId);
+
+      await message.edit({
+
+        content: "マスをタップしてください",
+
+        components: createBoard()
+
+      });
+
+    } catch (error) {
+
+      console.error(
+
+        "ボード更新エラー:",
+
+        error
+
+      );
+
+    }
+
+    editing.delete(interaction.user.id);
+
     await interaction.reply({
 
-      content: `${emojis[color]} ${name} に設定しました！`,
+      content:
+
+        `${colors[data.color].emoji} ${name} に設定しました！`,
 
       ephemeral: true
 
     });
+
+    return;
 
   }
 
