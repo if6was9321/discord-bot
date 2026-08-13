@@ -1,11 +1,10 @@
-const {
+con
 
   Client,
 
   GatewayIntentBits,
 
   ActionRowBuilder,
-
   ButtonBuilder,
 
   ButtonStyle,
