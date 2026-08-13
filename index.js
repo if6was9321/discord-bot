@@ -1,10 +1,11 @@
-con
+const {
 
   Client,
 
   GatewayIntentBits,
 
   ActionRowBuilder,
+
   ButtonBuilder,
 
   ButtonStyle,
@@ -15,9 +16,7 @@ con
 
   TextInputBuilder,
 
-  TextInputStyle,
-
-  Events
+  TextInputStyle
 
 } = require("discord.js");
 
@@ -27,125 +26,89 @@ const client = new Client({
 
 });
 
-// 25マスの状態
+// 25マス
 
 const cells = Array.from({ length: 25 }, () => ({
 
   name: "",
 
-  color: null
+  color: ""
 
 }));
 
-// ユーザーが編集中のマス
-
-const editing = new Map();
-
 // 色
 
-const colors = {
+const styles = {
 
-  red: {
+  red: ButtonStyle.Danger,
 
-    name: "赤",
+  green: ButtonStyle.Success,
 
-    emoji: "🔴",
+  blue: ButtonStyle.Primary,
 
-    style: ButtonStyle.Danger
-
-  },
-
-  green: {
-
-    name: "緑",
-
-    emoji: "🟢",
-
-    style: ButtonStyle.Success
-
-  },
-
-  blue: {
-
-    name: "青",
-
-    emoji: "🔵",
-
-    style: ButtonStyle.Primary
-
-  },
-
-  orange: {
-
-    name: "オレンジ",
-
-    emoji: "🟠",
-
-    style: ButtonStyle.Secondary
-
-  }
+  orange: ButtonStyle.Secondary
 
 };
 
-// 5×5のマスを作る
+const emojis = {
 
-function createBoard() {
+  red: "🔴",
+
+  green: "🟢",
+
+  blue: "🔵",
+
+  orange: "🟠"
+
+};
+
+// 盤面
+
+function board() {
 
   const rows = [];
 
-  for (let y = 0; y < 5; y++) {
+  for (let row = 0; row < 5; row++) {
 
-    const row = new ActionRowBuilder();
+    const actionRow = new ActionRowBuilder();
 
-    for (let x = 0; x < 5; x++) {
+    for (let col = 0; col < 5; col++) {
 
-      const index = y * 5 + x;
+      const i = row * 5 + col;
 
-      const cell = cells[index];
+      const cell = cells[i];
 
       const button = new ButtonBuilder()
 
-        .setCustomId(`cell_${index}`)
+        .setCustomId(`cell-${i}`)
 
         .setStyle(
 
           cell.color
 
-            ? colors[cell.color].style
+            ? styles[cell.color]
 
             : ButtonStyle.Secondary
 
         );
 
-      // 名前がある時だけ表示
+      // マス内には名前・数字を出さない
 
-      // 空マスは数字を表示しない
+      if (cell.color) {
 
-      if (cell.name) {
-
-        button.setLabel(cell.name);
-
-        if (cell.color) {
-
-          button.setEmoji(colors[cell.color].emoji);
-
-        }
+        button.setEmoji(emojis[cell.color]);
 
       } else {
 
-        // Discordボタンは完全な空文字にできないので
-
-        // 見えない文字を入れて空マスにする
-
-        button.setLabel("\u200B");
+        button.setLabel("・");
 
       }
 
-      row.addComponents(button);
+      actionRow.addComponents(button);
 
     }
 
-    rows.push(row);
+    rows.push(actionRow);
 
   }
 
@@ -153,316 +116,356 @@ function createBoard() {
 
 }
 
-client.once(Events.ClientReady, async readyClient => {
+// 名前一覧
 
-  console.log(`ログイン成功: ${readyClient.user.tag}`);
+function names() {
 
-  const commands = [
+  const list = [];
 
-    {
+  for (const cell of cells) {
 
-      name: "配置",
+    if (cell.name && cell.color) {
 
-      description: "配置ボードを表示します"
+      list.push(
 
-    }
-
-  ];
-
-  await client.application.commands.set(commands);
-
-  console.log("コマンド登録完了");
-
-});
-
-client.on(Events.InteractionCreate, async interaction => {
-
-  // ──────────────
-
-  // /配置
-
-  // ──────────────
-
-  if (interaction.isChatInputCommand()) {
-
-    if (interaction.commandName === "配置") {
-
-      await interaction.reply({
-
-        content: "マスをタップしてください",
-
-        components: createBoard()
-
-      });
-
-      return;
-
-    }
-
-  }
-
-  // ──────────────
-
-  // マスを押した
-
-  // ──────────────
-
-  if (
-
-    interaction.isButton() &&
-
-    interaction.customId.startsWith("cell_")
-
-  ) {
-
-    const index = Number(
-
-      interaction.customId.replace("cell_", "")
-
-    );
-
-    editing.set(interaction.user.id, {
-
-      index,
-
-      messageId: interaction.message.id,
-
-      channelId: interaction.channelId
-
-    });
-
-    const menu =
-
-      new StringSelectMenuBuilder()
-
-        .setCustomId("select_color")
-
-        .setPlaceholder("色を選択")
-
-        .addOptions(
-
-          {
-
-            label: "赤",
-
-            value: "red",
-
-            emoji: "🔴"
-
-          },
-
-          {
-
-            label: "緑",
-
-            value: "green",
-
-            emoji: "🟢"
-
-          },
-
-          {
-
-            label: "青",
-
-            value: "blue",
-
-            emoji: "🔵"
-
-          },
-
-          {
-
-            label: "オレンジ",
-
-            value: "orange",
-
-            emoji: "🟠"
-
-          }
-
-        );
-
-    const row =
-
-      new ActionRowBuilder()
-
-        .addComponents(menu);
-
-    await interaction.reply({
-
-      content: "色を選んでください",
-
-      components: [row],
-
-      ephemeral: true
-
-    });
-
-    return;
-
-  }
-
-  // ──────────────
-
-  // 色を選択
-
-  // ──────────────
-
-  if (
-
-    interaction.isStringSelectMenu() &&
-
-    interaction.customId === "select_color"
-
-  ) {
-
-    const data = editing.get(interaction.user.id);
-
-    if (!data) {
-
-      await interaction.reply({
-
-        content: "もう一度マスを選んでください",
-
-        ephemeral: true
-
-      });
-
-      return;
-
-    }
-
-    data.color = interaction.values[0];
-
-    editing.set(interaction.user.id, data);
-
-    const modal =
-
-      new ModalBuilder()
-
-        .setCustomId("name_modal")
-
-        .setTitle("名前を入力");
-
-    const input =
-
-      new TextInputBuilder()
-
-        .setCustomId("cell_name")
-
-        .setLabel("マスに表示する名前")
-
-        .setStyle(TextInputStyle.Short)
-
-        .setRequired(true)
-
-        .setMaxLength(20);
-
-    const row =
-
-      new ActionRowBuilder()
-
-        .addComponents(input);
-
-    modal.addComponents(row);
-
-    await interaction.showModal(modal);
-
-    return;
-
-  }
-
-  // ──────────────
-
-  // 名前を入力した
-
-  // ──────────────
-
-  if (
-
-    interaction.isModalSubmit() &&
-
-    interaction.customId === "name_modal"
-
-  ) {
-
-    const data = editing.get(interaction.user.id);
-
-    if (!data) {
-
-      await interaction.reply({
-
-        content: "もう一度マスを選んでください",
-
-        ephemeral: true
-
-      });
-
-      return;
-
-    }
-
-    const name =
-
-      interaction.fields.getTextInputValue("cell_name");
-
-    cells[data.index] = {
-
-      name,
-
-      color: data.color
-
-    };
-
-    // 元の5×5ボードを更新
-
-    try {
-
-      const channel =
-
-        await client.channels.fetch(data.channelId);
-
-      const message =
-
-        await channel.messages.fetch(data.messageId);
-
-      await message.edit({
-
-        content: "マスをタップしてください",
-
-        components: createBoard()
-
-      });
-
-    } catch (error) {
-
-      console.error(
-
-        "ボード更新エラー:",
-
-        error
+        `${emojis[cell.color]} ${cell.name}`
 
       );
 
     }
 
-    editing.delete(interaction.user.id);
+  }
 
-    await interaction.reply({
+  if (list.length === 0) {
 
-      content:
+    return "現在の配置：なし";
 
-        `${colors[data.color].emoji} ${name} に設定しました！`,
+  }
 
-      ephemeral: true
+  return "現在の配置\n" + list.join("\n");
 
-    });
+}
 
-    return;
+// 最新の盤面を更新
+
+async function updateBoard(channel) {
+
+  const messages = await channel.messages.fetch({
+
+    limit: 20
+
+  });
+
+  const message = messages.find(m =>
+
+    m.author.id === client.user.id &&
+
+    m.components.length === 5
+
+  );
+
+  if (!message) return;
+
+  await message.edit({
+
+    content:
+
+      "マスをタップしてください\n\n" +
+
+      names(),
+
+    components: board()
+
+  });
+
+}
+
+// 起動
+
+client.once("ready", async () => {
+
+  console.log(
+
+    `ログイン成功: ${client.user.tag}`
+
+  );
+
+  await client.application.commands.set([
+
+    {
+
+      name: "配置",
+
+      description: "5×5の配置ボード"
+
+    }
+
+  ]);
+
+});
+
+// 操作
+
+client.on("interactionCreate", async interaction => {
+
+  try {
+
+    // /配置
+
+    if (interaction.isChatInputCommand()) {
+
+      if (interaction.commandName !== "配置") return;
+
+      await interaction.reply({
+
+        content:
+
+          "マスをタップしてください\n\n" +
+
+          names(),
+
+        components: board()
+
+      });
+
+      return;
+
+    }
+
+    // マスをタップ
+
+    if (interaction.isButton()) {
+
+      if (!interaction.customId.startsWith("cell-")) {
+
+        return;
+
+      }
+
+      const index =
+
+        interaction.customId.split("-")[1];
+
+      const menu =
+
+        new StringSelectMenuBuilder()
+
+          .setCustomId(`color-${index}`)
+
+          .setPlaceholder("色を選ぶ")
+
+          .addOptions([
+
+            {
+
+              label: "赤",
+
+              value: "red",
+
+              emoji: "🔴"
+
+            },
+
+            {
+
+              label: "緑",
+
+              value: "green",
+
+              emoji: "🟢"
+
+            },
+
+            {
+
+              label: "青",
+
+              value: "blue",
+
+              emoji: "🔵"
+
+            },
+
+            {
+
+              label: "オレンジ",
+
+              value: "orange",
+
+              emoji: "🟠"
+
+            },
+
+            {
+
+              label: "解除",
+
+              value: "clear",
+
+              emoji: "⚪"
+
+            }
+
+          ]);
+
+      await interaction.reply({
+
+        content: "色を選んでください",
+
+        components: [
+
+          new ActionRowBuilder()
+
+            .addComponents(menu)
+
+        ],
+
+        ephemeral: true
+
+      });
+
+      return;
+
+    }
+
+    // 色選択
+
+    if (interaction.isStringSelectMenu()) {
+
+      if (!interaction.customId.startsWith("color-")) {
+
+        return;
+
+      }
+
+      const index =
+
+        Number(interaction.customId.split("-")[1]);
+
+      const color = interaction.values[0];
+
+      // 解除
+
+      if (color === "clear") {
+
+        cells[index] = {
+
+          name: "",
+
+          color: ""
+
+        };
+
+        await interaction.update({
+
+          content: "解除しました",
+
+          components: []
+
+        });
+
+        await updateBoard(interaction.channel);
+
+        return;
+
+      }
+
+      // 名前入力
+
+      const modal =
+
+        new ModalBuilder()
+
+          .setCustomId(`name-${index}-${color}`)
+
+          .setTitle("名前入力");
+
+      const input =
+
+        new TextInputBuilder()
+
+          .setCustomId("name")
+
+          .setLabel("名前")
+
+          .setStyle(TextInputStyle.Short)
+
+          .setRequired(true)
+
+          .setMaxLength(20);
+
+      modal.addComponents(
+
+        new ActionRowBuilder()
+
+          .addComponents(input)
+
+      );
+
+      await interaction.showModal(modal);
+
+      return;
+
+    }
+
+    // 名前入力完了
+
+    if (interaction.isModalSubmit()) {
+
+      if (!interaction.customId.startsWith("name-")) {
+
+        return;
+
+      }
+
+      const parts =
+
+        interaction.customId.split("-");
+
+      const index = Number(parts[1]);
+
+      const color = parts[2];
+
+      const name =
+
+        interaction.fields
+
+          .getTextInputValue("name")
+
+          .trim();
+
+      cells[index] = {
+
+        name: name,
+
+        color: color
+
+      };
+
+      await interaction.reply({
+
+        content:
+
+          `${emojis[color]} ${name} を配置しました`,
+
+        ephemeral: true
+
+      });
+
+      await updateBoard(interaction.channel);
+
+      return;
+
+    }
+
+  } catch (error) {
+
+    console.error(error);
 
   }
 
 });
 
-client.login(process.env.DISCORD_TOKEN);
+// ログイン
+
+client.login(process.env.DISCORD_TOKEN
